@@ -1,0 +1,56 @@
+name: CI — Build and Smoke Test
+
+on:
+  push:
+    branches: ["*"] # [main, master]
+  pull_request:
+    branches: ["*"] # [main, master]
+
+jobs:
+  build-and-start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Start server (background) and wait
+        run: |
+          nohup npm start > server.log 2>&1 & echo $! > server.pid
+          echo "Waiting for server to accept connections on http://localhost:3000..."
+          for i in {1..20}; do
+            if curl -sSf http://localhost:3000/ >/dev/null; then
+              echo "Server is up"
+              break
+            fi
+            sleep 1
+          done
+          if ! curl -sSf http://localhost:3000/ >/dev/null; then
+            echo "Server failed to start, dumping logs:" >&2
+            cat server.log >&2
+            exit 1
+          fi
+
+      - name: Smoke test API endpoints
+        run: |
+          curl -fS http://localhost:3000/ || (echo 'root endpoint failed' && exit 1)
+          curl -fS http://localhost:3000/api/courses || (echo '/api/courses failed' && exit 1)
+
+      - name: Teardown server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill "$(cat server.pid)" || true
+            rm -f server.pid
+          fi
+          echo "Done"
