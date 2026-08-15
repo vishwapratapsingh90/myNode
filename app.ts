@@ -50,20 +50,21 @@ server.listen(3000);
 console.log('Listening to port 3000...');
 */
 
-import Logger from './src/logger';
-import * as os from 'node:os';
-import * as http from 'node:http';
-import type { Socket } from 'node:net';
+import Logger from "./src/logger";
+import * as os from "node:os";
+import express from "express";
+import apiRouter from "./src/api";
+import type { Socket } from "node:net";
 
 // Testing Node Events and Events-Listeners.
 
 const logger = new Logger();
 
-logger.on('messageLogged', (arg: {id: number, url:string}) => {
-    console.log('Listener called', arg);
+logger.on("messageLogged", (arg: { id: number; url: string }) => {
+  console.log("Listener called", arg);
 });
 
-logger.log('message');
+logger.log("message");
 
 // OS info from OS module
 
@@ -72,26 +73,19 @@ const freeMemory = os.freemem();
 
 console.log(`Total Memory: ${totalMemory}, Total Free Memory: ${freeMemory}`);
 
-// http module
+// Express app
+const app = express();
+app.use(express.json());
 
-const server = http.createServer((req: http.IncomingMessage, res: http.ServerResponse) => {
-    if (req.url === '/' || req.url === '/api') {
-        res.setHeader('Server', 'Ubuntu');
-        res.write('Hello, World');
-        res.end();
-        return;
-    }
-
-    if (req.url === '/api/courses') {
-        res.setHeader('Content-Type', 'application/json');
-        res.write(JSON.stringify(['Beginners Course', 'Advanced Course', 'Expert Course']));
-        res.end();
-        return;
-    }
+app.get("/", (req, res) => {
+  res.setHeader("Server", "Ubuntu");
+  res.send("Hello, World");
 });
 
-server.on('connection', (socket: Socket) => {
-  console.log('New Connection', socket.remoteAddress);
-});
+// Mount API routes under /api
+app.use("/api", apiRouter);
 
-server.listen(3000, () => console.log('Listening to port 3000...'));
+const server = app.listen(3000, () => console.log("Listening to port 3000..."));
+server.on("connection", (socket: Socket) => {
+  console.log("New Connection", socket.remoteAddress);
+});
